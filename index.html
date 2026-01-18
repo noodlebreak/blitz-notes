@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Blitz Notes</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+            background: linear-gradient(135deg, #e0f2fe 0%, #f8fafc 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        #app-title {
+            font-size: 32px;
+            font-weight: 300;
+            color: #0284c7;
+            text-align: center;
+            margin-bottom: 40px;
+            cursor: pointer;
+            user-select: none;
+            letter-spacing: 2px;
+        }
+
+        #app-title:hover {
+            color: #0369a1;
+        }
+
+        .notes-list-btn {
+            position: fixed;
+            right: 30px;
+            top: 30px;
+            background: rgba(255, 255, 255, 0.9);
+            border: 1px solid rgba(2, 132, 199, 0.2);
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            color: #0284c7;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+
+        .notes-list-btn:hover {
+            background: rgba(255, 255, 255, 1);
+            border-color: rgba(2, 132, 199, 0.4);
+        }
+
+        #note-input {
+            width: 100%;
+            min-height: 400px;
+            padding: 20px;
+            font-size: 18px;
+            line-height: 1.6;
+            border: 1px solid rgba(2, 132, 199, 0.15);
+            border-radius: 12px;
+            background: rgba(255, 255, 255, 0.7);
+            color: #1e293b;
+            resize: vertical;
+            outline: none;
+            transition: all 0.2s;
+        }
+
+        #note-input:focus {
+            border-color: rgba(2, 132, 199, 0.3);
+            background: rgba(255, 255, 255, 0.85);
+        }
+
+        .hint {
+            text-align: center;
+            margin-top: 15px;
+            color: #64748b;
+            font-size: 13px;
+        }
+
+        #list-view {
+            display: none;
+        }
+
+        #list-view.active {
+            display: block;
+        }
+
+        .list-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+        }
+
+        .list-title {
+            font-size: 24px;
+            color: #0284c7;
+            font-weight: 300;
+        }
+
+        .notes-list {
+            list-style: none;
+        }
+
+        .note-item {
+            background: rgba(255, 255, 255, 0.8);
+            border: 1px solid rgba(2, 132, 199, 0.15);
+            border-radius: 8px;
+            padding: 15px 20px;
+            margin-bottom: 10px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .note-item:hover,
+        .note-item.selected {
+            background: rgba(255, 255, 255, 1);
+            border-color: rgba(2, 132, 199, 0.3);
+            transform: translateX(5px);
+        }
+
+        .note-item-actions {
+            display: none;
+            margin-top: 10px;
+            gap: 10px;
+        }
+
+        .note-item.show-actions .note-item-actions {
+            display: flex;
+        }
+
+        .action-btn {
+            padding: 6px 12px;
+            border: 1px solid rgba(2, 132, 199, 0.3);
+            border-radius: 6px;
+            background: rgba(255, 255, 255, 0.9);
+            cursor: pointer;
+            font-size: 13px;
+            transition: all 0.2s;
+        }
+
+        .action-btn.archive {
+            color: #0284c7;
+        }
+
+        .action-btn.delete {
+            color: #dc2626;
+            border-color: rgba(220, 38, 38, 0.3);
+        }
+
+        .action-btn:hover {
+            transform: scale(1.05);
+        }
+
+        .action-btn.archive:hover {
+            background: rgba(2, 132, 199, 0.1);
+        }
+
+        .action-btn.delete:hover {
+            background: rgba(220, 38, 38, 0.1);
+        }
+
+        .note-preview {
+            color: #1e293b;
+            font-size: 16px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .note-date {
+            color: #94a3b8;
+            font-size: 12px;
+            margin-top: 5px;
+        }
+
+        #detail-view {
+            display: none;
+        }
+
+        #detail-view.active {
+            display: block;
+        }
+
+        #note-detail {
+            width: 100%;
+            min-height: 400px;
+            padding: 20px;
+            font-size: 18px;
+            line-height: 1.6;
+            border: 1px solid rgba(2, 132, 199, 0.15);
+            border-radius: 12px;
+            background: rgba(255, 255, 255, 0.7);
+            color: #1e293b;
+            resize: vertical;
+            outline: none;
+        }
+
+        #note-detail[readonly] {
+            background: rgba(255, 255, 255, 0.5);
+            cursor: default;
+        }
+
+        #note-detail:not([readonly]):focus {
+            border-color: rgba(2, 132, 199, 0.3);
+            background: rgba(255, 255, 255, 0.85);
+        }
+
+        .empty-state {
+            text-align: center;
+            color: #94a3b8;
+            padding: 60px 20px;
+            font-size: 16px;
+        }
+
+        #home-view.hidden,
+        #list-view.hidden,
+        #detail-view.hidden {
+            display: none;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1 id="app-title">BLITZ NOTES</h1>
+
+        <button class="notes-list-btn" onclick="showList()">Notes List</button>
+
+        <!-- Home View -->
+        <div id="home-view">
+            <textarea id="note-input" placeholder="Start typing your note..." autofocus></textarea>
+            <div class="hint">Press ESC to save • Ctrl+P for notes list</div>
+        </div>
+
+        <!-- List View -->
+        <div id="list-view">
+            <div class="list-header">
+                <div class="list-title">Your Notes</div>
+            </div>
+            <ul class="notes-list" id="notes-list"></ul>
+            <div class="empty-state" id="empty-state">No notes yet. Start creating!</div>
+            <div class="hint">Use ↑/↓ to navigate • ←/→ to show actions • Enter to open • ESC to go back</div>
+        </div>
+
+        <!-- Detail View -->
+        <div id="detail-view">
+            <textarea id="note-detail" readonly></textarea>
+            <div class="hint">Press Enter to edit • ESC to go back</div>
+        </div>
+    </div>
+
+    <script>
+        const STORAGE_KEY = 'blitz_notes';
+        let notes = [];
+        let currentNoteId = null;
+        let selectedIndex = 0;
+
+        // Load notes from storage
+        function loadNotes() {
+            const stored = localStorage.getItem(STORAGE_KEY);
+            notes = stored ? JSON.parse(stored) : [];
+        }
+
+        // Save notes to storage
+        function saveNotes() {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(notes));
+        }
+
+        // Show home view
+        function showHome() {
+            document.getElementById('home-view').classList.remove('hidden');
+            document.getElementById('list-view').classList.remove('active');
+            document.getElementById('detail-view').classList.remove('active');
+            document.getElementById('note-input').value = '';
+            document.getElementById('note-input').focus();
+        }
+
+        // Show list view
+        function showList() {
+            document.getElementById('home-view').classList.add('hidden');
+            document.getElementById('list-view').classList.add('active');
+            document.getElementById('detail-view').classList.remove('active');
+            renderList();
+            selectedIndex = 0;
+            updateSelection();
+        }
+
+        // Show detail view
+        function showDetail(noteId) {
+            const note = notes.find(n => n.id === noteId);
+            if (!note) return;
+
+            currentNoteId = noteId;
+            document.getElementById('home-view').classList.add('hidden');
+            document.getElementById('list-view').classList.remove('active');
+            document.getElementById('detail-view').classList.add('active');
+
+            const detailTextarea = document.getElementById('note-detail');
+            detailTextarea.value = note.content;
+            detailTextarea.setAttribute('readonly', '');
+        }
+
+        // Archive note
+        function archiveNote(noteId) {
+            const index = notes.findIndex(n => n.id === noteId);
+            if (index !== -1) {
+                notes[index].archived = true;
+                saveNotes();
+                renderList();
+                if (selectedIndex >= notes.length) {
+                    selectedIndex = Math.max(0, notes.length - 1);
+                }
+                updateSelection();
+            }
+        }
+
+        // Delete note
+        function deleteNote(noteId) {
+            const index = notes.findIndex(n => n.id === noteId);
+            if (index !== -1) {
+                notes.splice(index, 1);
+                saveNotes();
+                renderList();
+                if (selectedIndex >= notes.length) {
+                    selectedIndex = Math.max(0, notes.length - 1);
+                }
+                updateSelection();
+            }
+        }
+
+        // Render notes list
+        function renderList() {
+            const listEl = document.getElementById('notes-list');
+            const emptyEl = document.getElementById('empty-state');
+
+            if (notes.length === 0) {
+                listEl.innerHTML = '';
+                emptyEl.style.display = 'block';
+                return;
+            }
+
+            emptyEl.style.display = 'none';
+            listEl.innerHTML = notes.map((note, index) => `
+                <li class="note-item" data-index="${index}" data-id="${note.id}">
+                    <div class="note-preview">${note.content.substring(0, 100)}</div>
+                    <div class="note-date">${new Date(note.timestamp).toLocaleString()}</div>
+                    <div class="note-item-actions">
+                        <button class="action-btn archive" onclick="event.stopPropagation(); archiveNote('${note.id}')">Archive</button>
+                        <button class="action-btn delete" onclick="event.stopPropagation(); deleteNote('${note.id}')">Delete</button>
+                    </div>
+                </li>
+            `).join('');
+
+            // Add click handlers
+            document.querySelectorAll('.note-item').forEach(item => {
+                item.addEventListener('click', () => {
+                    showDetail(item.dataset.id);
+                });
+            });
+        }
+
+        // Update selection in list
+        function updateSelection() {
+            const items = document.querySelectorAll('.note-item');
+            items.forEach((item, index) => {
+                item.classList.toggle('selected', index === selectedIndex);
+            });
+
+            if (items[selectedIndex]) {
+                items[selectedIndex].scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+            }
+        }
+
+        // Parse content into tasks
+        function parseContentIntoTasks(content) {
+            const lines = content.split('\n');
+            const tasks = [];
+            let currentTask = [];
+
+            for (const line of lines) {
+                const trimmedLine = line.trim();
+                // Check if line starts with a dash (task marker)
+                if (trimmedLine.startsWith('-')) {
+                    // Save previous task if exists
+                    if (currentTask.length > 0) {
+                        tasks.push(currentTask.join('\n'));
+                        currentTask = [];
+                    }
+                    // Start new task (remove the leading dash and space)
+                    currentTask.push(trimmedLine.substring(1).trim());
+                } else if (currentTask.length > 0) {
+                    // Continue current task
+                    currentTask.push(line);
+                } else {
+                    // No task started yet, treat as single task
+                    if (trimmedLine) {
+                        tasks.push(line);
+                    }
+                }
+            }
+
+            // Add last task if exists
+            if (currentTask.length > 0) {
+                tasks.push(currentTask.join('\n'));
+            }
+
+            return tasks.filter(task => task.trim());
+        }
+
+        // Save current note
+        function saveCurrentNote() {
+            const content = document.getElementById('note-input').value.trim();
+            if (!content) return;
+
+            // Parse content into individual tasks
+            const tasks = parseContentIntoTasks(content);
+
+            // Create a note for each task
+            const timestamp = Date.now();
+            tasks.forEach((taskContent, index) => {
+                const note = {
+                    id: `${timestamp}_${index}`,
+                    content: taskContent,
+                    timestamp: timestamp + index
+                };
+                notes.unshift(note);
+            });
+
+            saveNotes();
+            showHome();
+        }
+
+        // Update note in detail view
+        function updateNote() {
+            const content = document.getElementById('note-detail').value.trim();
+            if (!content || !currentNoteId) return;
+
+            const note = notes.find(n => n.id === currentNoteId);
+            if (note) {
+                note.content = content;
+                note.timestamp = Date.now();
+                saveNotes();
+            }
+        }
+
+        // Keyboard handlers
+        document.addEventListener('keydown', (e) => {
+            const homeView = document.getElementById('home-view');
+            const listView = document.getElementById('list-view');
+            const detailView = document.getElementById('detail-view');
+            const detailTextarea = document.getElementById('note-detail');
+
+            // Home view - ESC to save
+            if (!homeView.classList.contains('hidden')) {
+                if (e.key === 'Escape') {
+                    e.preventDefault();
+                    saveCurrentNote();
+                }
+                if (e.ctrlKey && e.key === 'p') {
+                    e.preventDefault();
+                    showList();
+                }
+            }
+
+            // List view
+            if (listView.classList.contains('active')) {
+                if (e.key === 'Escape') {
+                    e.preventDefault();
+                    showHome();
+                }
+
+                // Arrow key navigation
+                if (e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    selectedIndex = Math.max(0, selectedIndex - 1);
+                    updateSelection();
+                }
+                if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    selectedIndex = Math.min(notes.length - 1, selectedIndex + 1);
+                    updateSelection();
+                }
+
+                // Left/Right to show actions
+                if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+                    e.preventDefault();
+                    const items = document.querySelectorAll('.note-item');
+                    if (items[selectedIndex]) {
+                        const hasActions = items[selectedIndex].classList.contains('show-actions');
+                        // Remove actions from all items
+                        items.forEach(item => item.classList.remove('show-actions'));
+                        // Toggle actions on selected item
+                        if (!hasActions) {
+                            items[selectedIndex].classList.add('show-actions');
+                        }
+                    }
+                }
+
+                // Tab navigation (keep for backwards compatibility)
+                if (e.key === 'Tab') {
+                    e.preventDefault();
+                    if (e.shiftKey) {
+                        selectedIndex = Math.max(0, selectedIndex - 1);
+                    } else {
+                        selectedIndex = Math.min(notes.length - 1, selectedIndex + 1);
+                    }
+                    updateSelection();
+                }
+
+                if (e.key === 'Enter' && notes.length > 0) {
+                    e.preventDefault();
+                    const selectedNote = notes[selectedIndex];
+                    if (selectedNote) {
+                        showDetail(selectedNote.id);
+                    }
+                }
+            }
+
+            // Detail view
+            if (detailView.classList.contains('active')) {
+                if (e.key === 'Escape') {
+                    e.preventDefault();
+                    if (!detailTextarea.hasAttribute('readonly')) {
+                        updateNote();
+                    }
+                    showList();
+                }
+                if (e.key === 'Enter' && detailTextarea.hasAttribute('readonly')) {
+                    e.preventDefault();
+                    detailTextarea.removeAttribute('readonly');
+                    detailTextarea.focus();
+                }
+            }
+        });
+
+        // App title click
+        document.getElementById('app-title').addEventListener('click', showHome);
+
+        // Initialize
+        loadNotes();
+        showHome();
+    </script>
+</body>
+
+</html>

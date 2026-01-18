@@ -1,0 +1,53 @@
+# Build outputs
+build/
+dist/
+out/
+target/
+bin/
+obj/
+
+# Dependencies
+node_modules/
+vendor/
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Logs
+*.log
+logs/
+
+# Compiled files
+*.class
+*.o
+*.so
+*.dll
+*.exe
+*.pyc
+*.pyo
+*.pyd
+__pycache__/
+
+# Archives
+*.zip
+*.tar.gz
+*.rar
+*.7z
+*.apk
+*.aab
+*.ipa
+
+# IDE
+.DS_Store
+.vscode/
+.idea/
+*.swp
+*.swo
+*.sublime-*
+
+# OS
+Thumbs.db
+ehthumbs.db
+Desktop.ini
