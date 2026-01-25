@@ -58,6 +58,10 @@
             border-color: rgba(2, 132, 199, 0.4);
         }
 
+        .notes-list-btn.hidden {
+            display: none;
+        }
+
         #note-input {
             width: 100%;
             min-height: 400px;
@@ -120,11 +124,21 @@
             transition: all 0.2s;
         }
 
-        .note-item:hover,
-        .note-item.selected {
+        .note-item:hover {
             background: rgba(255, 255, 255, 1);
             border-color: rgba(2, 132, 199, 0.3);
             transform: translateX(5px);
+        }
+
+        .note-item.selected {
+            background: rgba(255, 255, 255, 1);
+            border-color: rgba(2, 132, 199, 0.6);
+            transform: translateX(5px);
+        }
+
+        .note-item.selected.focused {
+            border-color: rgba(2, 132, 199, 0.75);
+            box-shadow: 0 0 0 2px rgba(2, 132, 199, 0.2);
         }
 
         .note-item-actions {
@@ -243,9 +257,6 @@
 
         <!-- List View -->
         <div id="list-view">
-            <div class="list-header">
-                <div class="list-title">Your Notes</div>
-            </div>
             <ul class="notes-list" id="notes-list"></ul>
             <div class="empty-state" id="empty-state">No notes yet. Start creating!</div>
             <div class="hint">Use ↑/↓ to navigate • ←/→ to show actions • Enter to open • ESC to go back</div>
@@ -280,6 +291,7 @@
             document.getElementById('home-view').classList.remove('hidden');
             document.getElementById('list-view').classList.remove('active');
             document.getElementById('detail-view').classList.remove('active');
+            document.querySelector('.notes-list-btn').classList.remove('hidden');
             document.getElementById('note-input').value = '';
             document.getElementById('note-input').focus();
         }
@@ -289,6 +301,7 @@
             document.getElementById('home-view').classList.add('hidden');
             document.getElementById('list-view').classList.add('active');
             document.getElementById('detail-view').classList.remove('active');
+            document.querySelector('.notes-list-btn').classList.add('hidden');
             renderList();
             selectedIndex = 0;
             updateSelection();
@@ -303,6 +316,7 @@
             document.getElementById('home-view').classList.add('hidden');
             document.getElementById('list-view').classList.remove('active');
             document.getElementById('detail-view').classList.add('active');
+            document.querySelector('.notes-list-btn').classList.remove('hidden');
 
             const detailTextarea = document.getElementById('note-detail');
             detailTextarea.value = note.content;
@@ -373,6 +387,7 @@
             const items = document.querySelectorAll('.note-item');
             items.forEach((item, index) => {
                 item.classList.toggle('selected', index === selectedIndex);
+                item.classList.toggle('focused', index === selectedIndex);
             });
 
             if (items[selectedIndex]) {
@@ -551,4 +566,5 @@
     </script>
 </body>
 
+</html>
 </html>
