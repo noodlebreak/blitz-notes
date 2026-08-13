@@ -130,15 +130,22 @@
             transform: translateX(5px);
         }
 
-        .note-item.selected {
+        .note-item.selected,
+        .note-item:focus {
             background: rgba(255, 255, 255, 1);
             border-color: rgba(2, 132, 199, 0.6);
             transform: translateX(5px);
+            outline: none;
         }
 
-        .note-item.selected.focused {
+        .note-item.selected.focused,
+        .note-item:focus-visible {
             border-color: rgba(2, 132, 199, 0.75);
             box-shadow: 0 0 0 2px rgba(2, 132, 199, 0.2);
+        }
+
+        .note-item.archived {
+            opacity: 0.55;
         }
 
         .note-item-actions {
@@ -182,12 +189,71 @@
             background: rgba(220, 38, 38, 0.1);
         }
 
+        .action-btn:focus-visible {
+            outline: 2px solid #0284c7;
+            outline-offset: 2px;
+        }
+
+        .action-btn.delete:focus-visible {
+            outline-color: #dc2626;
+        }
+
         .note-preview {
             color: #1e293b;
             font-size: 16px;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
+        }
+
+        .task-preview {
+            list-style: none;
+            color: #1e293b;
+            font-size: 16px;
+            line-height: 1.5;
+        }
+
+        .task-preview .task-line {
+            display: flex;
+            align-items: flex-start;
+            gap: 8px;
+        }
+
+        .task-preview .task-plain {
+            display: block;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+
+        .task-preview .task-blank {
+            display: block;
+            height: 1.5em;
+            overflow: hidden;
+            pointer-events: none;
+        }
+
+        .task-preview input[type="checkbox"] {
+            margin-top: 3px;
+            flex-shrink: 0;
+            accent-color: #0284c7;
+            width: 16px;
+            height: 16px;
+            cursor: pointer;
+        }
+
+        .task-preview input[type="checkbox"]:focus-visible {
+            outline: 2px solid #0284c7;
+            outline-offset: 2px;
+        }
+
+        .task-preview .task-text {
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+
+        .task-preview .task-text.done {
+            text-decoration: line-through;
+            color: #94a3b8;
         }
 
         .note-date {
@@ -240,6 +306,80 @@
         #detail-view.hidden {
             display: none;
         }
+
+        #modal-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(15, 23, 42, 0.35);
+            z-index: 100;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        #modal-overlay.open {
+            display: flex;
+        }
+
+        .modal {
+            background: #f8fafc;
+            border: 1px solid rgba(2, 132, 199, 0.25);
+            border-radius: 12px;
+            padding: 24px;
+            width: 100%;
+            max-width: 420px;
+            box-shadow: 0 10px 40px rgba(2, 132, 199, 0.15);
+        }
+
+        .modal h2 {
+            font-weight: 300;
+            color: #0284c7;
+            font-size: 22px;
+            margin-bottom: 8px;
+        }
+
+        .modal p {
+            color: #64748b;
+            font-size: 13px;
+            margin-bottom: 16px;
+            line-height: 1.5;
+        }
+
+        .modal input[type="password"],
+        .modal input[type="file"] {
+            width: 100%;
+            padding: 10px 12px;
+            font-size: 16px;
+            border: 1px solid rgba(2, 132, 199, 0.2);
+            border-radius: 8px;
+            margin-bottom: 10px;
+            background: rgba(255, 255, 255, 0.9);
+            color: #1e293b;
+            outline: none;
+        }
+
+        .modal input:focus {
+            border-color: rgba(2, 132, 199, 0.5);
+        }
+
+        .modal-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            margin-top: 8px;
+        }
+
+        .modal-error {
+            color: #dc2626;
+            font-size: 13px;
+            margin-top: 10px;
+            min-height: 1.2em;
+        }
+
+        .hidden-field {
+            display: none;
+        }
     </style>
 </head>
 
@@ -247,19 +387,19 @@
     <div class="container">
         <h1 id="app-title">BLITZ NOTES</h1>
 
-        <button class="notes-list-btn" onclick="showList()">Notes List</button>
+        <button type="button" class="notes-list-btn" onclick="showList()">Notes List</button>
 
         <!-- Home View -->
         <div id="home-view">
             <textarea id="note-input" placeholder="Start typing your note..." autofocus></textarea>
-            <div class="hint">Press ESC to save • Ctrl+P for notes list</div>
+            <div class="hint">ESC save • Ctrl+P list • Ctrl+E export • Ctrl+I import</div>
         </div>
 
         <!-- List View -->
         <div id="list-view">
             <ul class="notes-list" id="notes-list"></ul>
             <div class="empty-state" id="empty-state">No notes yet. Start creating!</div>
-            <div class="hint">Use ↑/↓ to navigate • ←/→ to show actions • Enter to open • ESC to go back</div>
+            <div class="hint">↑/↓ notes or tasks • Space toggle task • ←/→ or Tab Archive/Delete • Del to delete • Enter open • ESC back</div>
         </div>
 
         <!-- Detail View -->
@@ -269,24 +409,47 @@
         </div>
     </div>
 
+    <div id="modal-overlay">
+        <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+            <h2 id="modal-title">Export notes</h2>
+            <p id="modal-desc">Choose a password. You will need it to import this file.</p>
+            <input type="file" id="modal-file" class="hidden-field" accept="application/json,.json">
+            <input type="password" id="modal-password" placeholder="Password" autocomplete="new-password">
+            <input type="password" id="modal-password2" placeholder="Confirm password" autocomplete="new-password">
+            <div class="modal-actions">
+                <button type="button" class="action-btn" id="modal-cancel">Cancel</button>
+                <button type="button" class="action-btn archive" id="modal-confirm">Export</button>
+            </div>
+            <div class="modal-error" id="modal-error"></div>
+        </div>
+    </div>
+
     <script>
         const STORAGE_KEY = 'blitz_notes';
+        const BACKUP_APP = 'blitz-notes';
+        const PBKDF2_ITERATIONS = 150000;
         let notes = [];
         let currentNoteId = null;
         let selectedIndex = 0;
+        let modalMode = null;
 
-        // Load notes from storage
+        function escapeHtml(text) {
+            return String(text)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;');
+        }
+
         function loadNotes() {
             const stored = localStorage.getItem(STORAGE_KEY);
             notes = stored ? JSON.parse(stored) : [];
         }
 
-        // Save notes to storage
         function saveNotes() {
             localStorage.setItem(STORAGE_KEY, JSON.stringify(notes));
         }
 
-        // Show home view
         function showHome() {
             document.getElementById('home-view').classList.remove('hidden');
             document.getElementById('list-view').classList.remove('active');
@@ -296,7 +459,6 @@
             document.getElementById('note-input').focus();
         }
 
-        // Show list view
         function showList() {
             document.getElementById('home-view').classList.add('hidden');
             document.getElementById('list-view').classList.add('active');
@@ -304,10 +466,9 @@
             document.querySelector('.notes-list-btn').classList.add('hidden');
             renderList();
             selectedIndex = 0;
-            updateSelection();
+            updateSelection({ focusItem: true });
         }
 
-        // Show detail view
         function showDetail(noteId) {
             const note = notes.find(n => n.id === noteId);
             if (!note) return;
@@ -323,35 +484,92 @@
             detailTextarea.setAttribute('readonly', '');
         }
 
-        // Archive note
-        function archiveNote(noteId) {
-            const index = notes.findIndex(n => n.id === noteId);
-            if (index !== -1) {
-                notes[index].archived = true;
-                saveNotes();
-                renderList();
-                if (selectedIndex >= notes.length) {
-                    selectedIndex = Math.max(0, notes.length - 1);
-                }
-                updateSelection();
-            }
+        function hideItemActions() {
+            document.querySelectorAll('.note-item').forEach(item => item.classList.remove('show-actions'));
         }
 
-        // Delete note
+        function archiveNote(noteId) {
+            const note = notes.find(n => n.id === noteId);
+            if (!note) return;
+            note.archived = !note.archived;
+            saveNotes();
+            renderList();
+            if (selectedIndex >= notes.length) {
+                selectedIndex = Math.max(0, notes.length - 1);
+            }
+            updateSelection({ focusItem: true });
+        }
+
         function deleteNote(noteId) {
             const index = notes.findIndex(n => n.id === noteId);
-            if (index !== -1) {
-                notes.splice(index, 1);
-                saveNotes();
-                renderList();
-                if (selectedIndex >= notes.length) {
-                    selectedIndex = Math.max(0, notes.length - 1);
-                }
-                updateSelection();
+            if (index === -1) return;
+
+            const preview = notes[index].content.split('\n')[0].substring(0, 60);
+            if (!confirm(`Delete this note?\n\n${preview || '(empty)'}`)) return;
+
+            notes.splice(index, 1);
+            saveNotes();
+            renderList();
+            if (selectedIndex >= notes.length) {
+                selectedIndex = Math.max(0, notes.length - 1);
             }
+            updateSelection({ focusItem: true });
         }
 
-        // Render notes list
+        function parseTaskLine(line) {
+            const match = line.match(/^\s*-\s+(?:\[([ xX])\]\s*)?(.*)$/);
+            if (!match) return null;
+            return {
+                done: (match[1] || '').toLowerCase() === 'x',
+                text: match[2]
+            };
+        }
+
+        function renderNoteBody(note) {
+            const lines = note.content.split('\n');
+            const hasTasks = lines.some(line => parseTaskLine(line));
+            if (!hasTasks) {
+                return `<div class="note-preview">${escapeHtml(note.content.substring(0, 100))}</div>`;
+            }
+
+            const items = lines.map((line, i) => {
+                const task = parseTaskLine(line);
+                if (task) {
+                    const doneClass = task.done ? ' done' : '';
+                    const checked = task.done ? 'checked' : '';
+                    return `<li class="task-line">
+                        <input type="checkbox" class="task-check" data-line="${i}" ${checked}>
+                        <span class="task-text${doneClass}">${escapeHtml(task.text)}</span>
+                    </li>`;
+                }
+                if (!line.trim()) {
+                    return `<li class="task-blank" aria-hidden="true"></li>`;
+                }
+                return `<li class="task-plain">${escapeHtml(line)}</li>`;
+            }).join('');
+
+            return `<ul class="task-preview">${items}</ul>`;
+        }
+
+        function toggleTask(noteId, lineIndex) {
+            const note = notes.find(n => n.id === noteId);
+            if (!note) return;
+            const lines = note.content.split('\n');
+            const parsed = parseTaskLine(lines[lineIndex]);
+            if (!parsed) return;
+            const mark = parsed.done ? ' ' : 'x';
+            lines[lineIndex] = `- [${mark}] ${parsed.text}`;
+            note.content = lines.join('\n');
+            saveNotes();
+            const noteIndex = notes.findIndex(n => n.id === noteId);
+            renderList();
+            if (noteIndex !== -1) selectedIndex = noteIndex;
+            updateSelection();
+            const item = document.querySelectorAll('.note-item')[selectedIndex];
+            const check = item && item.querySelector(`input.task-check[data-line="${lineIndex}"]`);
+            if (check) check.focus();
+        }
+
         function renderList() {
             const listEl = document.getElementById('notes-list');
             const emptyEl = document.getElementById('empty-state');
@@ -364,26 +582,18 @@
 
             emptyEl.style.display = 'none';
             listEl.innerHTML = notes.map((note, index) => `
-                <li class="note-item" data-index="${index}" data-id="${note.id}">
-                    <div class="note-preview">${note.content.substring(0, 100)}</div>
-                    <div class="note-date">${new Date(note.timestamp).toLocaleString()}</div>
+                <li class="note-item${note.archived ? ' archived' : ''}" data-index="${index}" data-id="${escapeHtml(note.id)}" tabindex="-1">
+                    ${renderNoteBody(note)}
+                    <div class="note-date">${new Date(note.timestamp).toLocaleString()}${note.archived ? ' · archived' : ''}</div>
                     <div class="note-item-actions">
-                        <button class="action-btn archive" onclick="event.stopPropagation(); archiveNote('${note.id}')">Archive</button>
-                        <button class="action-btn delete" onclick="event.stopPropagation(); deleteNote('${note.id}')">Delete</button>
+                        <button type="button" class="action-btn archive">${note.archived ? 'Unarchive' : 'Archive'}</button>
+                        <button type="button" class="action-btn delete">Delete</button>
                     </div>
                 </li>
             `).join('');
-
-            // Add click handlers
-            document.querySelectorAll('.note-item').forEach(item => {
-                item.addEventListener('click', () => {
-                    showDetail(item.dataset.id);
-                });
-            });
         }
 
-        // Update selection in list
-        function updateSelection() {
+        function updateSelection(opts = {}) {
             const items = document.querySelectorAll('.note-item');
             items.forEach((item, index) => {
                 item.classList.toggle('selected', index === selectedIndex);
@@ -392,69 +602,145 @@
 
             if (items[selectedIndex]) {
                 items[selectedIndex].scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-            }
-        }
-
-        // Parse content into tasks
-        function parseContentIntoTasks(content) {
-            const lines = content.split('\n');
-            const tasks = [];
-            let currentTask = [];
-
-            for (const line of lines) {
-                const trimmedLine = line.trim();
-                // Check if line starts with a dash (task marker)
-                if (trimmedLine.startsWith('-')) {
-                    // Save previous task if exists
-                    if (currentTask.length > 0) {
-                        tasks.push(currentTask.join('\n'));
-                        currentTask = [];
-                    }
-                    // Start new task (remove the leading dash and space)
-                    currentTask.push(trimmedLine.substring(1).trim());
-                } else if (currentTask.length > 0) {
-                    // Continue current task
-                    currentTask.push(line);
-                } else {
-                    // No task started yet, treat as single task
-                    if (trimmedLine) {
-                        tasks.push(line);
-                    }
+                if (opts.focusItem) {
+                    items[selectedIndex].focus();
                 }
             }
-
-            // Add last task if exists
-            if (currentTask.length > 0) {
-                tasks.push(currentTask.join('\n'));
-            }
-
-            return tasks.filter(task => task.trim());
         }
 
-        // Save current note
+        function selectedItemEls() {
+            const items = document.querySelectorAll('.note-item');
+            const selected = items[selectedIndex];
+            if (!selected) {
+                return { items, selected: null, archiveBtn: null, deleteBtn: null, checks: [] };
+            }
+            return {
+                items,
+                selected,
+                archiveBtn: selected.querySelector('.action-btn.archive'),
+                deleteBtn: selected.querySelector('.action-btn.delete'),
+                checks: Array.from(selected.querySelectorAll('input.task-check'))
+            };
+        }
+
+        function handleListHorizontal(e) {
+            if (notes.length === 0) return;
+            e.preventDefault();
+
+            const { selected, archiveBtn, deleteBtn } = selectedItemEls();
+            if (!selected) return;
+
+            const active = document.activeElement;
+            const onArchive = active === archiveBtn;
+            const onDelete = active === deleteBtn;
+            const actionsOpen = selected.classList.contains('show-actions');
+
+            if (e.key === 'ArrowRight') {
+                if (!onArchive && !onDelete) {
+                    hideItemActions();
+                    selected.classList.add('show-actions');
+                    archiveBtn.focus();
+                } else if (onArchive) {
+                    deleteBtn.focus();
+                }
+                return;
+            }
+
+            if (!onArchive && !onDelete) {
+                hideItemActions();
+                selected.classList.add('show-actions');
+                deleteBtn.focus();
+            } else if (onDelete) {
+                archiveBtn.focus();
+            } else if (onArchive || actionsOpen) {
+                hideItemActions();
+                selected.focus();
+            }
+        }
+
+        function handleListTab(e) {
+            if (notes.length === 0) return;
+            e.preventDefault();
+
+            const { selected, archiveBtn, deleteBtn, checks } = selectedItemEls();
+            if (!selected) return;
+
+            const active = document.activeElement;
+            const checkIdx = checks.indexOf(active);
+            const onCheck = checkIdx !== -1;
+            const onArchive = active === archiveBtn;
+            const onDelete = active === deleteBtn;
+
+            if (!e.shiftKey) {
+                if (onDelete) {
+                    hideItemActions();
+                    selectedIndex = (selectedIndex + 1) % notes.length;
+                    updateSelection({ focusItem: true });
+                    return;
+                }
+                if (onArchive) {
+                    deleteBtn.focus();
+                    return;
+                }
+                if (onCheck) {
+                    if (checkIdx < checks.length - 1) {
+                        checks[checkIdx + 1].focus();
+                    } else {
+                        hideItemActions();
+                        selected.classList.add('show-actions');
+                        archiveBtn.focus();
+                    }
+                    return;
+                }
+                if (checks.length > 0) {
+                    checks[0].focus();
+                } else {
+                    hideItemActions();
+                    selected.classList.add('show-actions');
+                    archiveBtn.focus();
+                }
+                return;
+            }
+
+            if (onDelete) {
+                archiveBtn.focus();
+                return;
+            }
+            if (onArchive) {
+                if (checks.length > 0) {
+                    checks[checks.length - 1].focus();
+                } else {
+                    selected.focus();
+                }
+                return;
+            }
+            if (onCheck) {
+                if (checkIdx > 0) {
+                    checks[checkIdx - 1].focus();
+                } else {
+                    selected.focus();
+                }
+                return;
+            }
+            hideItemActions();
+            selectedIndex = (selectedIndex - 1 + notes.length) % notes.length;
+            updateSelection({ focusItem: true });
+        }
+
         function saveCurrentNote() {
             const content = document.getElementById('note-input').value.trim();
             if (!content) return;
 
-            // Parse content into individual tasks
-            const tasks = parseContentIntoTasks(content);
-
-            // Create a note for each task
-            const timestamp = Date.now();
-            tasks.forEach((taskContent, index) => {
-                const note = {
-                    id: `${timestamp}_${index}`,
-                    content: taskContent,
-                    timestamp: timestamp + index
-                };
-                notes.unshift(note);
+            notes.unshift({
+                id: String(Date.now()),
+                content,
+                timestamp: Date.now()
             });
 
             saveNotes();
             showHome();
         }
 
-        // Update note in detail view
         function updateNote() {
             const content = document.getElementById('note-detail').value.trim();
             if (!content || !currentNoteId) return;
@@ -467,14 +753,263 @@
             }
         }
 
-        // Keyboard handlers
+        function bufToB64(buf) {
+            const bytes = new Uint8Array(buf);
+            let binary = '';
+            for (let i = 0; i < bytes.length; i++) {
+                binary += String.fromCharCode(bytes[i]);
+            }
+            return btoa(binary);
+        }
+
+        function b64ToBuf(b64) {
+            const binary = atob(b64);
+            const bytes = new Uint8Array(binary.length);
+            for (let i = 0; i < binary.length; i++) {
+                bytes[i] = binary.charCodeAt(i);
+            }
+            return bytes;
+        }
+
+        async function deriveKey(password, salt) {
+            const material = await crypto.subtle.importKey(
+                'raw',
+                new TextEncoder().encode(password),
+                'PBKDF2',
+                false,
+                ['deriveKey']
+            );
+            return crypto.subtle.deriveKey(
+                {
+                    name: 'PBKDF2',
+                    salt,
+                    iterations: PBKDF2_ITERATIONS,
+                    hash: 'SHA-256'
+                },
+                material,
+                { name: 'AES-GCM', length: 256 },
+                false,
+                ['encrypt', 'decrypt']
+            );
+        }
+
+        async function encryptNotes(password) {
+            const salt = crypto.getRandomValues(new Uint8Array(16));
+            const iv = crypto.getRandomValues(new Uint8Array(12));
+            const key = await deriveKey(password, salt);
+            const plaintext = new TextEncoder().encode(JSON.stringify(notes));
+            const ciphertext = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, plaintext);
+            return {
+                app: BACKUP_APP,
+                version: 1,
+                encrypted: true,
+                salt: bufToB64(salt),
+                iv: bufToB64(iv),
+                data: bufToB64(ciphertext)
+            };
+        }
+
+        async function decryptNotes(payload, password) {
+            const salt = b64ToBuf(payload.salt);
+            const iv = b64ToBuf(payload.iv);
+            const key = await deriveKey(password, salt);
+            const plaintext = await crypto.subtle.decrypt(
+                { name: 'AES-GCM', iv },
+                key,
+                b64ToBuf(payload.data)
+            );
+            return JSON.parse(new TextDecoder().decode(plaintext));
+        }
+
+        function downloadJson(filename, obj) {
+            const blob = new Blob([JSON.stringify(obj, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            URL.revokeObjectURL(url);
+        }
+
+        function mergeImportedNotes(imported) {
+            if (!Array.isArray(imported)) {
+                throw new Error('Backup does not contain a notes list.');
+            }
+
+            const byId = new Map(notes.map(note => [String(note.id), note]));
+            imported.forEach(note => {
+                if (!note || note.id == null || typeof note.content !== 'string') return;
+                byId.set(String(note.id), {
+                    id: String(note.id),
+                    content: note.content,
+                    timestamp: typeof note.timestamp === 'number' ? note.timestamp : Date.now(),
+                    archived: !!note.archived
+                });
+            });
+
+            notes = Array.from(byId.values()).sort((a, b) => b.timestamp - a.timestamp);
+            saveNotes();
+        }
+
+        function openModal(mode) {
+            modalMode = mode;
+            const overlay = document.getElementById('modal-overlay');
+            const fileInput = document.getElementById('modal-file');
+            const password2 = document.getElementById('modal-password2');
+            const title = document.getElementById('modal-title');
+            const desc = document.getElementById('modal-desc');
+            const confirmBtn = document.getElementById('modal-confirm');
+
+            document.getElementById('modal-password').value = '';
+            password2.value = '';
+            fileInput.value = '';
+            document.getElementById('modal-error').textContent = '';
+
+            if (mode === 'export') {
+                title.textContent = 'Export notes';
+                desc.textContent = 'Choose a password. You will need it to import this file.';
+                fileInput.classList.add('hidden-field');
+                password2.classList.remove('hidden-field');
+                confirmBtn.textContent = 'Export';
+            } else {
+                title.textContent = 'Import notes';
+                desc.textContent = 'Pick an exported JSON file and enter the password used to encrypt it.';
+                fileInput.classList.remove('hidden-field');
+                password2.classList.add('hidden-field');
+                confirmBtn.textContent = 'Import';
+            }
+
+            overlay.classList.add('open');
+            if (mode === 'import') {
+                fileInput.focus();
+            } else {
+                document.getElementById('modal-password').focus();
+            }
+        }
+
+        function closeModal() {
+            document.getElementById('modal-overlay').classList.remove('open');
+            modalMode = null;
+        }
+
+        function setModalError(message) {
+            document.getElementById('modal-error').textContent = message;
+        }
+
+        async function submitModal() {
+            const password = document.getElementById('modal-password').value;
+            if (!password) {
+                setModalError('Password is required.');
+                return;
+            }
+
+            try {
+                if (modalMode === 'export') {
+                    const confirmPassword = document.getElementById('modal-password2').value;
+                    if (password !== confirmPassword) {
+                        setModalError('Passwords do not match.');
+                        return;
+                    }
+                    const payload = await encryptNotes(password);
+                    const stamp = new Date().toISOString().slice(0, 10);
+                    downloadJson(`blitz-notes-${stamp}.json`, payload);
+                    closeModal();
+                    return;
+                }
+
+                const file = document.getElementById('modal-file').files[0];
+                if (!file) {
+                    setModalError('Choose a backup file.');
+                    return;
+                }
+
+                const parsed = JSON.parse(await file.text());
+                let imported;
+                if (parsed && parsed.encrypted && parsed.app === BACKUP_APP) {
+                    imported = await decryptNotes(parsed, password);
+                } else {
+                    throw new Error('Not a Blitz Notes encrypted backup.');
+                }
+
+                mergeImportedNotes(imported);
+                closeModal();
+                showList();
+            } catch (err) {
+                if (err && err.name === 'OperationError') {
+                    setModalError('Wrong password or damaged file.');
+                    return;
+                }
+                setModalError(err.message || 'Could not complete that action.');
+            }
+        }
+
+        document.getElementById('notes-list').addEventListener('click', (e) => {
+            const item = e.target.closest('.note-item');
+            if (!item) return;
+            const id = item.dataset.id;
+
+            if (e.target.closest('.action-btn.archive')) {
+                e.stopPropagation();
+                archiveNote(id);
+                return;
+            }
+            if (e.target.closest('.action-btn.delete')) {
+                e.stopPropagation();
+                deleteNote(id);
+                return;
+            }
+            if (e.target.closest('input.task-check')) {
+                e.stopPropagation();
+                selectedIndex = Number(item.dataset.index);
+                updateSelection();
+                return;
+            }
+            showDetail(id);
+        });
+
+        document.getElementById('notes-list').addEventListener('change', (e) => {
+            if (!e.target.matches('input.task-check')) return;
+            const item = e.target.closest('.note-item');
+            if (!item) return;
+            toggleTask(item.dataset.id, Number(e.target.dataset.line));
+        });
+
+        document.getElementById('modal-cancel').addEventListener('click', closeModal);
+        document.getElementById('modal-confirm').addEventListener('click', submitModal);
+        document.getElementById('modal-overlay').addEventListener('click', (e) => {
+            if (e.target.id === 'modal-overlay') closeModal();
+        });
+
         document.addEventListener('keydown', (e) => {
             const homeView = document.getElementById('home-view');
             const listView = document.getElementById('list-view');
             const detailView = document.getElementById('detail-view');
             const detailTextarea = document.getElementById('note-detail');
 
-            // Home view - ESC to save
+            if (modalMode) {
+                if (e.key === 'Escape') {
+                    e.preventDefault();
+                    closeModal();
+                } else if (e.key === 'Enter' && e.target.tagName !== 'BUTTON') {
+                    e.preventDefault();
+                    submitModal();
+                }
+                return;
+            }
+
+            if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'e') {
+                e.preventDefault();
+                openModal('export');
+                return;
+            }
+            if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'i') {
+                e.preventDefault();
+                openModal('import');
+                return;
+            }
+
             if (!homeView.classList.contains('hidden')) {
                 if (e.key === 'Escape') {
                     e.preventDefault();
@@ -486,52 +1021,78 @@
                 }
             }
 
-            // List view
             if (listView.classList.contains('active')) {
+                if ((e.key === ' ' || e.key === 'Spacebar') && e.target.closest('input.task-check')) {
+                    return;
+                }
+
                 if (e.key === 'Escape') {
                     e.preventDefault();
                     showHome();
                 }
 
-                // Arrow key navigation
                 if (e.key === 'ArrowUp') {
-                    e.preventDefault();
-                    selectedIndex = Math.max(0, selectedIndex - 1);
-                    updateSelection();
+                    const { selected, checks } = selectedItemEls();
+                    const checkIdx = checks.indexOf(document.activeElement);
+                    if (selected && checkIdx !== -1) {
+                        e.preventDefault();
+                        if (checkIdx <= 0) {
+                            selected.focus();
+                        } else {
+                            checks[checkIdx - 1].focus();
+                        }
+                    } else {
+                        e.preventDefault();
+                        hideItemActions();
+                        selectedIndex = Math.max(0, selectedIndex - 1);
+                        updateSelection({ focusItem: true });
+                    }
                 }
                 if (e.key === 'ArrowDown') {
-                    e.preventDefault();
-                    selectedIndex = Math.min(notes.length - 1, selectedIndex + 1);
-                    updateSelection();
-                }
-
-                // Left/Right to show actions
-                if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
-                    e.preventDefault();
-                    const items = document.querySelectorAll('.note-item');
-                    if (items[selectedIndex]) {
-                        const hasActions = items[selectedIndex].classList.contains('show-actions');
-                        // Remove actions from all items
-                        items.forEach(item => item.classList.remove('show-actions'));
-                        // Toggle actions on selected item
-                        if (!hasActions) {
-                            items[selectedIndex].classList.add('show-actions');
+                    const { selected, archiveBtn, checks } = selectedItemEls();
+                    const checkIdx = checks.indexOf(document.activeElement);
+                    if (selected && checkIdx !== -1) {
+                        e.preventDefault();
+                        if (checkIdx < checks.length - 1) {
+                            checks[checkIdx + 1].focus();
+                        } else if (selected.classList.contains('show-actions') && archiveBtn) {
+                            archiveBtn.focus();
+                        } else {
+                            hideItemActions();
+                            selectedIndex = Math.min(notes.length - 1, selectedIndex + 1);
+                            updateSelection({ focusItem: true });
                         }
+                    } else {
+                        e.preventDefault();
+                        hideItemActions();
+                        selectedIndex = Math.min(notes.length - 1, selectedIndex + 1);
+                        updateSelection({ focusItem: true });
                     }
                 }
 
-                // Tab navigation (keep for backwards compatibility)
+                if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+                    handleListHorizontal(e);
+                }
+
                 if (e.key === 'Tab') {
+                    handleListTab(e);
+                }
+
+                if ((e.key === 'Delete' || e.key === 'Del') && notes.length > 0) {
+                    if (e.target.closest('input, textarea')) return;
                     e.preventDefault();
-                    if (e.shiftKey) {
-                        selectedIndex = Math.max(0, selectedIndex - 1);
-                    } else {
-                        selectedIndex = Math.min(notes.length - 1, selectedIndex + 1);
+                    const selectedNote = notes[selectedIndex];
+                    if (selectedNote) {
+                        deleteNote(selectedNote.id);
                     }
-                    updateSelection();
                 }
 
                 if (e.key === 'Enter' && notes.length > 0) {
+                    if (e.target.closest('.action-btn')) return;
+                    if (e.target.closest('input.task-check')) {
+                        e.preventDefault();
+                        return;
+                    }
                     e.preventDefault();
                     const selectedNote = notes[selectedIndex];
                     if (selectedNote) {
@@ -540,7 +1101,6 @@
                 }
             }
 
-            // Detail view
             if (detailView.classList.contains('active')) {
                 if (e.key === 'Escape') {
                     e.preventDefault();
@@ -557,14 +1117,11 @@
             }
         });
 
-        // App title click
         document.getElementById('app-title').addEventListener('click', showHome);
 
-        // Initialize
         loadNotes();
         showHome();
     </script>
 </body>
 
-</html>
 </html>
