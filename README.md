@@ -1,8 +1,6 @@
 Blitz Notes Taker app
 - fuss free note taker app
 - focus on taking down something, not fight the app interface and other bullshit
-- fucking NOTE DOWN THE SHIT I HAVE IN MIND - OR CLIPBOARD - RRRRRRRRIGHT NOW!
-- FUCK YEAH!!! AHHHHHHHHHHHHHHHHHHHH YEAHHHHHHHHHHHH! FUCK YOUUUUUUU FUCK YEAHHHHHHHHHH!!! FUCKING NOTE TAKER SHIT SO COMPLICATED I HAD TO CREATE THIS SHIT MODAFUCKKKKKKKKAH!!!! AHHHHHHHHHHHHHHHHHHHH!!!!
 
 interface:
 - home page of app is just name of the app that we can click to come back to home page
