@@ -1,4 +1,7 @@
 Blitz Notes Taker app
+
+**Live: [https://noodlebreak.github.io/blitz-notes/](https://noodlebreak.github.io/blitz-notes/)**
+
 - fuss free note taker app
 - focus on taking down something, not fight the app interface and other bullshit
 
