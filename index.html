@@ -842,14 +842,19 @@
             URL.revokeObjectURL(url);
         }
 
+        function validImportedNotes(imported) {
+            if (!Array.isArray(imported)) return [];
+            return imported.filter(note => note && note.id != null && typeof note.content === 'string');
+        }
+
         function mergeImportedNotes(imported) {
-            if (!Array.isArray(imported)) {
-                throw new Error('Backup does not contain a notes list.');
+            const usable = validImportedNotes(imported);
+            if (usable.length === 0) {
+                throw new Error('No notes found in this file.');
             }
 
             const byId = new Map(notes.map(note => [String(note.id), note]));
-            imported.forEach(note => {
-                if (!note || note.id == null || typeof note.content !== 'string') return;
+            usable.forEach(note => {
                 byId.set(String(note.id), {
                     id: String(note.id),
                     content: note.content,
@@ -878,23 +883,36 @@
 
             if (mode === 'export') {
                 title.textContent = 'Export notes';
-                desc.textContent = 'Leave the password blank for a plain file, or set one to encrypt it.';
                 fileInput.classList.add('hidden-field');
-                password2.classList.remove('hidden-field');
                 document.getElementById('modal-password').placeholder = 'Password (optional)';
                 confirmBtn.textContent = 'Export';
+                if (notes.length === 0) {
+                    desc.textContent = 'There is nothing to export.';
+                    document.getElementById('modal-password').classList.add('hidden-field');
+                    password2.classList.add('hidden-field');
+                    confirmBtn.classList.add('hidden-field');
+                } else {
+                    desc.textContent = 'Leave the password blank for a plain file, or set one to encrypt it.';
+                    document.getElementById('modal-password').classList.remove('hidden-field');
+                    password2.classList.remove('hidden-field');
+                    confirmBtn.classList.remove('hidden-field');
+                }
             } else {
                 title.textContent = 'Import notes';
                 desc.textContent = 'Pick an exported JSON file. Enter a password only if you encrypted it.';
                 fileInput.classList.remove('hidden-field');
+                document.getElementById('modal-password').classList.remove('hidden-field');
                 password2.classList.add('hidden-field');
                 document.getElementById('modal-password').placeholder = 'Password (if encrypted)';
+                confirmBtn.classList.remove('hidden-field');
                 confirmBtn.textContent = 'Import';
             }
 
             overlay.classList.add('open');
             if (mode === 'import') {
                 fileInput.focus();
+            } else if (mode === 'export' && notes.length === 0) {
+                document.getElementById('modal-cancel').focus();
             } else {
                 document.getElementById('modal-password').focus();
             }
@@ -914,6 +932,10 @@
 
             try {
                 if (modalMode === 'export') {
+                    if (notes.length === 0) {
+                        setModalError('There is nothing to export.');
+                        return;
+                    }
                     const confirmPassword = document.getElementById('modal-password2').value;
                     if (password || confirmPassword) {
                         if (!password) {
@@ -938,7 +960,20 @@
                     return;
                 }
 
-                const parsed = JSON.parse(await file.text());
+                const text = await file.text();
+                if (!text.trim()) {
+                    setModalError('This file is empty.');
+                    return;
+                }
+
+                let parsed;
+                try {
+                    parsed = JSON.parse(text);
+                } catch (err) {
+                    setModalError('File is not valid JSON.');
+                    return;
+                }
+
                 if (!parsed || parsed.app !== BACKUP_APP) {
                     throw new Error('Not a Blitz Notes backup.');
                 }
@@ -954,6 +989,11 @@
                     imported = parsed.notes;
                 } else {
                     throw new Error('Not a Blitz Notes backup.');
+                }
+
+                if (validImportedNotes(imported).length === 0) {
+                    setModalError('No notes found in this file.');
+                    return;
                 }
 
                 mergeImportedNotes(imported);
