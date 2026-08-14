@@ -412,9 +412,9 @@
     <div id="modal-overlay">
         <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
             <h2 id="modal-title">Export notes</h2>
-            <p id="modal-desc">Choose a password. You will need it to import this file.</p>
+            <p id="modal-desc">Leave the password blank for a plain file, or set one to encrypt it.</p>
             <input type="file" id="modal-file" class="hidden-field" accept="application/json,.json">
-            <input type="password" id="modal-password" placeholder="Password" autocomplete="new-password">
+            <input type="password" id="modal-password" placeholder="Password (optional)" autocomplete="new-password">
             <input type="password" id="modal-password2" placeholder="Confirm password" autocomplete="new-password">
             <div class="modal-actions">
                 <button type="button" class="action-btn" id="modal-cancel">Cancel</button>
@@ -793,6 +793,15 @@
             );
         }
 
+        function plainBackup() {
+            return {
+                app: BACKUP_APP,
+                version: 1,
+                encrypted: false,
+                notes
+            };
+        }
+
         async function encryptNotes(password) {
             const salt = crypto.getRandomValues(new Uint8Array(16));
             const iv = crypto.getRandomValues(new Uint8Array(12));
@@ -869,15 +878,17 @@
 
             if (mode === 'export') {
                 title.textContent = 'Export notes';
-                desc.textContent = 'Choose a password. You will need it to import this file.';
+                desc.textContent = 'Leave the password blank for a plain file, or set one to encrypt it.';
                 fileInput.classList.add('hidden-field');
                 password2.classList.remove('hidden-field');
+                document.getElementById('modal-password').placeholder = 'Password (optional)';
                 confirmBtn.textContent = 'Export';
             } else {
                 title.textContent = 'Import notes';
-                desc.textContent = 'Pick an exported JSON file and enter the password used to encrypt it.';
+                desc.textContent = 'Pick an exported JSON file. Enter a password only if you encrypted it.';
                 fileInput.classList.remove('hidden-field');
                 password2.classList.add('hidden-field');
+                document.getElementById('modal-password').placeholder = 'Password (if encrypted)';
                 confirmBtn.textContent = 'Import';
             }
 
@@ -900,19 +911,21 @@
 
         async function submitModal() {
             const password = document.getElementById('modal-password').value;
-            if (!password) {
-                setModalError('Password is required.');
-                return;
-            }
 
             try {
                 if (modalMode === 'export') {
                     const confirmPassword = document.getElementById('modal-password2').value;
-                    if (password !== confirmPassword) {
-                        setModalError('Passwords do not match.');
-                        return;
+                    if (password || confirmPassword) {
+                        if (!password) {
+                            setModalError('Enter a password, or leave both fields blank.');
+                            return;
+                        }
+                        if (password !== confirmPassword) {
+                            setModalError('Passwords do not match.');
+                            return;
+                        }
                     }
-                    const payload = await encryptNotes(password);
+                    const payload = password ? await encryptNotes(password) : plainBackup();
                     const stamp = new Date().toISOString().slice(0, 10);
                     downloadJson(`blitz-notes-${stamp}.json`, payload);
                     closeModal();
@@ -926,11 +939,21 @@
                 }
 
                 const parsed = JSON.parse(await file.text());
+                if (!parsed || parsed.app !== BACKUP_APP) {
+                    throw new Error('Not a Blitz Notes backup.');
+                }
+
                 let imported;
-                if (parsed && parsed.encrypted && parsed.app === BACKUP_APP) {
+                if (parsed.encrypted) {
+                    if (!password) {
+                        setModalError('This backup is encrypted. Enter the password.');
+                        return;
+                    }
                     imported = await decryptNotes(parsed, password);
+                } else if (Array.isArray(parsed.notes)) {
+                    imported = parsed.notes;
                 } else {
-                    throw new Error('Not a Blitz Notes encrypted backup.');
+                    throw new Error('Not a Blitz Notes backup.');
                 }
 
                 mergeImportedNotes(imported);
