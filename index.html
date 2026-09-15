@@ -273,6 +273,21 @@
             color: #94a3b8;
         }
 
+        .note-link {
+            color: #0284c7;
+            text-decoration: underline;
+            word-break: break-all;
+            cursor: pointer;
+        }
+
+        .note-link:hover {
+            color: #0369a1;
+        }
+
+        .task-text.done .note-link {
+            color: #94a3b8;
+        }
+
         .note-date {
             color: #94a3b8;
             font-size: 12px;
@@ -303,12 +318,35 @@
 
         #note-detail[readonly] {
             background: rgba(255, 255, 255, 0.5);
-            cursor: default;
+            cursor: text;
         }
 
         #note-detail:not([readonly]):focus {
             border-color: rgba(2, 132, 199, 0.3);
             background: rgba(255, 255, 255, 0.85);
+        }
+
+        #note-detail.is-hidden {
+            display: none;
+        }
+
+        .note-detail-view {
+            width: 100%;
+            min-height: 400px;
+            padding: 20px;
+            font-size: 18px;
+            line-height: 1.6;
+            border: 1px solid rgba(2, 132, 199, 0.15);
+            border-radius: 12px;
+            background: rgba(255, 255, 255, 0.5);
+            color: #1e293b;
+            white-space: pre-wrap;
+            word-break: break-word;
+            cursor: text;
+        }
+
+        .note-detail-view.is-hidden {
+            display: none;
         }
 
         .empty-state {
@@ -412,7 +450,7 @@
         <!-- Home View -->
         <div id="home-view">
             <textarea id="note-input" placeholder="Start typing your note..." autofocus></textarea>
-            <div class="hint">ESC save • Ctrl+P list • Ctrl+E export • Ctrl+I import</div>
+            <div class="hint">Autosave • ESC or click away to save • Ctrl+P list • Ctrl+E export • Ctrl+I import</div>
         </div>
 
         <!-- List View -->
@@ -425,7 +463,8 @@
         <!-- Detail View -->
         <div id="detail-view">
             <textarea id="note-detail" readonly></textarea>
-            <div class="hint">Press Enter to edit • ESC to go back</div>
+            <div id="note-detail-view" class="note-detail-view is-hidden"></div>
+            <div class="hint">Click a link to open it • click elsewhere or Enter to edit • autosave • ESC back</div>
         </div>
     </div>
 
@@ -446,12 +485,16 @@
 
     <script>
         const STORAGE_KEY = 'blitz_notes';
+        const DRAFT_KEY = 'blitz_notes_draft';
+        const AUTOSAVE_MS = 200;
         const BACKUP_APP = 'blitz-notes';
         const PBKDF2_ITERATIONS = 150000;
         let notes = [];
         let currentNoteId = null;
         let selectedIndex = 0;
         let modalMode = null;
+        let composeDraftTimer = null;
+        let detailSaveTimer = null;
 
         function escapeHtml(text) {
             return String(text)
@@ -459,6 +502,46 @@
                 .replace(/</g, '&lt;')
                 .replace(/>/g, '&gt;')
                 .replace(/"/g, '&quot;');
+        }
+
+        function trimUrlMatch(raw) {
+            let url = String(raw).replace(/[.,;:!?]+$/g, '');
+            if (!url.includes('(')) {
+                url = url.replace(/\)+$/g, '');
+            }
+            return url;
+        }
+
+        function toSafeHref(raw) {
+            let url = trimUrlMatch(raw);
+            if (/^www\./i.test(url)) {
+                url = 'https://' + url;
+            }
+            if (!/^https?:\/\//i.test(url)) return null;
+            return url;
+        }
+
+        function linkifyText(text) {
+            const src = String(text);
+            const re = /\b((?:https?:\/\/|www\.)[^\s<>"'`]+)/gi;
+            let out = '';
+            let last = 0;
+            let match;
+            while ((match = re.exec(src))) {
+                const raw = match[1];
+                const trimmed = trimUrlMatch(raw);
+                const href = toSafeHref(raw);
+                out += escapeHtml(src.slice(last, match.index));
+                const trailing = raw.slice(trimmed.length);
+                if (href) {
+                    out += `<a class="note-link" href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer">${escapeHtml(trimmed)}</a>${escapeHtml(trailing)}`;
+                } else {
+                    out += escapeHtml(raw);
+                }
+                last = match.index + raw.length;
+            }
+            out += escapeHtml(src.slice(last));
+            return out;
         }
 
         function loadNotes() {
@@ -470,16 +553,116 @@
             localStorage.setItem(STORAGE_KEY, JSON.stringify(notes));
         }
 
-        function showHome() {
+        function persistComposeDraft() {
+            const raw = document.getElementById('note-input').value;
+            if (raw.trim()) {
+                localStorage.setItem(DRAFT_KEY, raw);
+            } else {
+                localStorage.removeItem(DRAFT_KEY);
+            }
+        }
+
+        function scheduleComposeDraft() {
+            clearTimeout(composeDraftTimer);
+            composeDraftTimer = setTimeout(() => {
+                composeDraftTimer = null;
+                persistComposeDraft();
+            }, AUTOSAVE_MS);
+        }
+
+        function flushComposeDraft() {
+            clearTimeout(composeDraftTimer);
+            composeDraftTimer = null;
+            persistComposeDraft();
+        }
+
+        function commitCompose() {
+            flushComposeDraft();
+            const input = document.getElementById('note-input');
+            let content = input.value.trim();
+            if (!content) {
+                content = (localStorage.getItem(DRAFT_KEY) || '').trim();
+            }
+            if (!content) {
+                localStorage.removeItem(DRAFT_KEY);
+                return false;
+            }
+
+            notes.unshift({
+                id: String(Date.now()),
+                content,
+                timestamp: Date.now()
+            });
+            saveNotes();
+            localStorage.removeItem(DRAFT_KEY);
+            input.value = '';
+            return true;
+        }
+
+        function persistDetail() {
+            const detail = document.getElementById('note-detail');
+            if (!detail || detail.hasAttribute('readonly')) return;
+            updateNote();
+        }
+
+        function scheduleDetailSave() {
+            const detail = document.getElementById('note-detail');
+            if (!detail || detail.hasAttribute('readonly')) return;
+            clearTimeout(detailSaveTimer);
+            detailSaveTimer = setTimeout(() => {
+                detailSaveTimer = null;
+                persistDetail();
+            }, AUTOSAVE_MS);
+        }
+
+        function flushDetailSave() {
+            clearTimeout(detailSaveTimer);
+            detailSaveTimer = null;
+            persistDetail();
+        }
+
+        function persistAllPending() {
+            commitCompose();
+            flushDetailSave();
+        }
+
+        function setDetailMode(mode) {
+            const detail = document.getElementById('note-detail');
+            const view = document.getElementById('note-detail-view');
+            if (mode === 'view') {
+                detail.setAttribute('readonly', '');
+                detail.classList.add('is-hidden');
+                view.innerHTML = linkifyText(detail.value);
+                view.classList.remove('is-hidden');
+            } else {
+                detail.removeAttribute('readonly');
+                detail.classList.remove('is-hidden');
+                view.classList.add('is-hidden');
+                detail.focus();
+            }
+        }
+
+        function beginDetailEdit() {
+            const detail = document.getElementById('note-detail');
+            if (!detail.hasAttribute('readonly') && !detail.classList.contains('is-hidden')) return;
+            setDetailMode('edit');
+        }
+
+        function showHome(opts = {}) {
+            if (!opts.restoreDraft) {
+                persistAllPending();
+            }
             document.getElementById('home-view').classList.remove('hidden');
             document.getElementById('list-view').classList.remove('active');
             document.getElementById('detail-view').classList.remove('active');
             document.querySelector('.notes-list-btn').classList.remove('hidden');
-            document.getElementById('note-input').value = '';
-            document.getElementById('note-input').focus();
+            const input = document.getElementById('note-input');
+            input.value = opts.restoreDraft ? (localStorage.getItem(DRAFT_KEY) || '') : '';
+            input.focus();
         }
 
         function showList() {
+            persistAllPending();
             document.getElementById('home-view').classList.add('hidden');
             document.getElementById('list-view').classList.add('active');
             document.getElementById('detail-view').classList.remove('active');
@@ -490,6 +673,7 @@
         }
 
         function showDetail(noteId) {
+            persistAllPending();
             const note = notes.find(n => n.id === noteId);
             if (!note) return;
 
@@ -501,7 +685,7 @@
 
             const detailTextarea = document.getElementById('note-detail');
             detailTextarea.value = note.content;
-            detailTextarea.setAttribute('readonly', '');
+            setDetailMode('view');
         }
 
         function hideItemActions() {
@@ -549,7 +733,7 @@
             const lines = note.content.split('\n');
             const hasTasks = lines.some(line => parseTaskLine(line));
             if (!hasTasks) {
-                return `<div class="note-preview">${escapeHtml(note.content.substring(0, 100))}</div>`;
+                return `<div class="note-preview">${linkifyText(note.content.substring(0, 100))}</div>`;
             }
 
             const items = lines.map((line, i) => {
@@ -559,13 +743,13 @@
                     const checked = task.done ? 'checked' : '';
                     return `<li class="task-line">
                         <input type="checkbox" class="task-check" data-line="${i}" ${checked}>
-                        <span class="task-text${doneClass}">${escapeHtml(task.text)}</span>
+                        <span class="task-text${doneClass}">${linkifyText(task.text)}</span>
                     </li>`;
                 }
                 if (!line.trim()) {
                     return `<li class="task-blank" aria-hidden="true"></li>`;
                 }
-                return `<li class="task-plain">${escapeHtml(line)}</li>`;
+                return `<li class="task-plain">${linkifyText(line)}</li>`;
             }).join('');
 
             return `<ul class="task-preview">${items}</ul>`;
@@ -748,16 +932,7 @@
         }
 
         function saveCurrentNote() {
-            const content = document.getElementById('note-input').value.trim();
-            if (!content) return;
-
-            notes.unshift({
-                id: String(Date.now()),
-                content,
-                timestamp: Date.now()
-            });
-
-            saveNotes();
+            commitCompose();
             showHome();
         }
 
@@ -766,7 +941,7 @@
             if (!content || !currentNoteId) return;
 
             const note = notes.find(n => n.id === currentNoteId);
-            if (note) {
+            if (note && note.content !== content) {
                 note.content = content;
                 note.timestamp = Date.now();
                 saveNotes();
@@ -888,6 +1063,7 @@
         }
 
         function openModal(mode) {
+            persistAllPending();
             modalMode = mode;
             const overlay = document.getElementById('modal-overlay');
             const fileInput = document.getElementById('modal-file');
@@ -1049,6 +1225,10 @@
                 updateSelection();
                 return;
             }
+            if (e.target.closest('a.note-link')) {
+                e.stopPropagation();
+                return;
+            }
             showDetail(id);
         });
 
@@ -1193,17 +1373,54 @@
                     showList();
                 }
                 if (e.key === 'Enter' && detailTextarea.hasAttribute('readonly')) {
+                    if (e.target.closest('a.note-link')) return;
                     e.preventDefault();
-                    detailTextarea.removeAttribute('readonly');
-                    detailTextarea.focus();
+                    beginDetailEdit();
                 }
             }
         });
 
         document.getElementById('app-title').addEventListener('click', showHome);
 
+        const noteInput = document.getElementById('note-input');
+        noteInput.addEventListener('input', scheduleComposeDraft);
+        noteInput.addEventListener('blur', () => {
+            requestAnimationFrame(() => {
+                if (document.activeElement === noteInput) return;
+                commitCompose();
+            });
+        });
+
+        const noteDetail = document.getElementById('note-detail');
+        noteDetail.addEventListener('mousedown', () => {
+            if (noteDetail.hasAttribute('readonly')) {
+                beginDetailEdit();
+            }
+        });
+        noteDetail.addEventListener('input', scheduleDetailSave);
+        noteDetail.addEventListener('blur', () => {
+            requestAnimationFrame(() => {
+                if (document.activeElement === noteDetail) return;
+                flushDetailSave();
+            });
+        });
+
+        const noteDetailView = document.getElementById('note-detail-view');
+        noteDetailView.addEventListener('click', (e) => {
+            if (e.target.closest('a.note-link')) {
+                e.stopPropagation();
+                return;
+            }
+            beginDetailEdit();
+        });
+
+        window.addEventListener('pagehide', () => {
+            persistComposeDraft();
+            flushDetailSave();
+        });
+
         loadNotes();
-        showHome();
+        showHome({ restoreDraft: true });
     </script>
 </body>
 
